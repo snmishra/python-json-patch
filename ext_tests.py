@@ -29,9 +29,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-
 """ Script to run external tests, eg from
 https://github.com/json-patch/json-patch-tests """
+from __future__ import annotations
 
 import doctest
 import unittest
@@ -40,42 +40,43 @@ import sys
 
 
 class TestCaseTemplate(unittest.TestCase):
-    """ A generic test case for running external tests """
+    """A generic test case for running external tests"""
 
     def _test(self, test):
-        if 'doc' not in test or 'patch' not in test:
+        if "doc" not in test or "patch" not in test:
             # incomplete
             return
 
-        if test.get('disabled', False):
+        if test.get("disabled", False):
             # test is disabled
             return
 
-        if 'error' in test:
+        if "error" in test:
             self.assertRaises(
                 (jsonpatch.JsonPatchException, jsonpatch.JsonPointerException),
-                jsonpatch.apply_patch, test['doc'], test['patch']
-                )
+                jsonpatch.apply_patch,
+                test["doc"],
+                test["patch"],
+            )
 
         else:
             try:
-                res = jsonpatch.apply_patch(test['doc'], test['patch'])
+                res = jsonpatch.apply_patch(test["doc"], test["patch"])
             except jsonpatch.JsonPatchException as jpe:
-                raise Exception(test.get('comment', '')) from jpe
+                raise Exception(test.get("comment", "")) from jpe
 
             # if there is no 'expected' we only verify that applying the patch
             # does not raise an exception
-            if 'expected' in test:
-                self.assertEqual(res, test['expected'], test.get('comment', ''))
+            if "expected" in test:
+                self.assertEqual(res, test["expected"], test.get("comment", ""))
 
 
 def make_test_case(tests):
-
     class MyTestCase(TestCaseTemplate):
         pass
 
     for n, test in enumerate(tests):
-        add_test_method(MyTestCase, 'test_%d' % n, test)
+        add_test_method(MyTestCase, "test_%d" % n, test)
 
     return MyTestCase
 
@@ -84,8 +85,7 @@ def add_test_method(cls, name, test):
     setattr(cls, name, lambda self: self._test(test))
 
 
-
-modules = ['jsonpatch']
+modules = ["jsonpatch"]
 coverage_modules = []
 
 
@@ -113,7 +113,8 @@ runner = unittest.TextTestRunner(verbosity=1)
 
 try:
     import coverage
-    cov = coverage.Coverage()
+
+    cov: coverage.Coverage | None = coverage.Coverage()
 except ImportError:
     cov = None
 
@@ -132,8 +133,10 @@ if cov is not None:
     cov.erase()
 
 if cov is None:
-    sys.stderr.write("""
+    sys.stderr.write(
+        """
 No coverage reporting done (Python module "coverage" is missing)
 Please install the python-coverage package to get coverage reporting.
-""")
+"""
+    )
     sys.stderr.flush()

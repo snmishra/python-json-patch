@@ -1,3 +1,5 @@
 coverage
 wheel
-pypandoc
+black
+ruff
+mypy

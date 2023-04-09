@@ -9,11 +9,7 @@ import jsonpatch
 import jsonpointer
 import sys
 
-try:
-    from types import MappingProxyType
-except ImportError:
-    # Python < 3.3
-    MappingProxyType = dict
+from types import MappingProxyType
 
 
 class ApplyPatchTestCase(unittest.TestCase):
