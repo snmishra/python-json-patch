@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # python-json-patch - An implementation of the JSON Patch format
 # https://github.com/stefankoegl/python-json-patch
@@ -32,49 +31,29 @@
 
 """ Apply JSON-Patches (RFC 6902) """
 
-from __future__ import unicode_literals
 
 import collections
 import copy
 import functools
 import json
-import sys
-
-try:
-    from collections.abc import Sequence
-except ImportError:  # Python 3
-    from collections import Sequence
-
-try:
-    from types import MappingProxyType
-except ImportError:
-    # Python < 3.3
-    MappingProxyType = dict
+from collections.abc import MutableMapping, MutableSequence, Sequence
+from types import MappingProxyType
 
 from jsonpointer import JsonPointer, JsonPointerException
-
 
 _ST_ADD = 0
 _ST_REMOVE = 1
 
 
-try:
-    from collections.abc import MutableMapping, MutableSequence
-
-except ImportError:
-    from collections import MutableMapping, MutableSequence
-    str = unicode
-
 # Will be parsed by setup.py to determine package metadata
-__author__ = 'Stefan Kögl <stefan@skoegl.net>'
-__version__ = '1.32'
-__website__ = 'https://github.com/stefankoegl/python-json-patch'
-__license__ = 'Modified BSD License'
+__author__ = "Stefan Kögl <stefan@skoegl.net>"
+__version__ = "1.32"
+__website__ = "https://github.com/stefankoegl/python-json-patch"
+__license__ = "Modified BSD License"
 
 
 # pylint: disable=E0611,W0404
-if sys.version_info >= (3, 0):
-    basestring = (bytes, str)  # pylint: disable=C0103,W0622
+basestring = (bytes, str)  # pylint: disable=C0103,W0622
 
 
 class JsonPatchException(Exception):
@@ -82,7 +61,7 @@ class JsonPatchException(Exception):
 
 
 class InvalidJsonPatch(JsonPatchException):
-    """ Raised if an invalid JSON Patch is created """
+    """Raised if an invalid JSON Patch is created"""
 
 
 class JsonPatchConflict(JsonPatchException):
@@ -95,7 +74,7 @@ class JsonPatchConflict(JsonPatchException):
 
 
 class JsonPatchTestFailed(JsonPatchException, AssertionError):
-    """ A Test operation failed """
+    """A Test operation failed"""
 
 
 def multidict(ordered_pairs):
@@ -105,11 +84,11 @@ def multidict(ordered_pairs):
     for key, value in ordered_pairs:
         mdict[key].append(value)
 
-    return dict(
+    return {
         # unpack lists that have only 1 item
-        (key, values[0] if len(values) == 1 else values)
+        key: values[0] if len(values) == 1 else values
         for key, values in mdict.items()
-    )
+    }
 
 
 # The "object_pairs_hook" parameter is used to handle duplicate keys when
@@ -181,30 +160,30 @@ def make_patch(src, dst, pointer_cls=JsonPointer):
     return JsonPatch.from_diff(src, dst, pointer_cls=pointer_cls)
 
 
-class PatchOperation(object):
+class PatchOperation:
     """A single operation inside a JSON Patch."""
 
     def __init__(self, operation, pointer_cls=JsonPointer):
         self.pointer_cls = pointer_cls
 
-        if not operation.__contains__('path'):
+        if not operation.__contains__("path"):
             raise InvalidJsonPatch("Operation must have a 'path' member")
 
-        if isinstance(operation['path'], self.pointer_cls):
-            self.location = operation['path'].path
-            self.pointer = operation['path']
+        if isinstance(operation["path"], self.pointer_cls):
+            self.location = operation["path"].path
+            self.pointer = operation["path"]
         else:
-            self.location = operation['path']
+            self.location = operation["path"]
             try:
                 self.pointer = self.pointer_cls(self.location)
             except TypeError as ex:
-                raise InvalidJsonPatch("Invalid 'path'")
+                raise InvalidJsonPatch(f"Invalid 'path': {ex}")
 
         self.operation = operation
 
     def apply(self, obj):
         """Abstract method that applies a patch operation to the specified object."""
-        raise NotImplementedError('should implement the patch operation.')
+        raise NotImplementedError("should implement the patch operation.")
 
     def __hash__(self):
         return hash(frozenset(self.operation.items()))
@@ -215,11 +194,11 @@ class PatchOperation(object):
         return self.operation == other.operation
 
     def __ne__(self, other):
-        return not(self == other)
+        return not (self == other)
 
     @property
     def path(self):
-        return '/'.join(self.pointer.parts[:-1])
+        return "/".join(self.pointer.parts[:-1])
 
     @property
     def key(self):
@@ -232,7 +211,7 @@ class PatchOperation(object):
     def key(self, value):
         self.pointer.parts[-1] = str(value)
         self.location = self.pointer.path
-        self.operation['path'] = self.location
+        self.operation["path"] = self.location
 
 
 class RemoveOperation(PatchOperation):
@@ -242,12 +221,12 @@ class RemoveOperation(PatchOperation):
         subobj, part = self.pointer.to_last(obj)
 
         if isinstance(subobj, Sequence) and not isinstance(part, int):
-            raise JsonPointerException("invalid array index '{0}'".format(part))
+            raise JsonPointerException(f"invalid array index '{part}'")
 
         try:
-            del subobj[part]
-        except (KeyError, IndexError) as ex:
-            msg = "can't remove a non-existent object '{0}'".format(part)
+            del subobj[part]  # pyright: ignore [reportGeneralTypeIssues]
+        except (KeyError, IndexError):
+            msg = f"can't remove a non-existent object '{part}'"
             raise JsonPatchConflict(msg)
 
         return obj
@@ -275,14 +254,13 @@ class AddOperation(PatchOperation):
     def apply(self, obj):
         try:
             value = self.operation["value"]
-        except KeyError as ex:
-            raise InvalidJsonPatch(
-                "The operation does not contain a 'value' member")
+        except KeyError:
+            raise InvalidJsonPatch("The operation does not contain a 'value' member")
 
         subobj, part = self.pointer.to_last(obj)
 
-        if isinstance(subobj, MutableSequence):
-            if part == '-':
+        if isinstance(subobj, MutableSequence) and part is not None:
+            if part == "-":
                 subobj.append(value)  # pylint: disable=E1103
 
             elif part > len(subobj) or part < 0:
@@ -299,9 +277,11 @@ class AddOperation(PatchOperation):
 
         else:
             if part is None:
-                raise TypeError("invalid document type {0}".format(type(subobj)))
+                raise TypeError(f"invalid document type {type(subobj)}")
             else:
-                raise JsonPatchConflict("unable to fully resolve json pointer {0}, part {1}".format(self.location, part))
+                raise JsonPatchConflict(
+                    f"unable to fully resolve json pointer {self.location}, part {part}"
+                )
         return obj
 
     def _on_undo_remove(self, path, key):
@@ -327,9 +307,8 @@ class ReplaceOperation(PatchOperation):
     def apply(self, obj):
         try:
             value = self.operation["value"]
-        except KeyError as ex:
-            raise InvalidJsonPatch(
-                "The operation does not contain a 'value' member")
+        except KeyError:
+            raise InvalidJsonPatch("The operation does not contain a 'value' member")
 
         subobj, part = self.pointer.to_last(obj)
 
@@ -337,7 +316,9 @@ class ReplaceOperation(PatchOperation):
             return value
 
         if part == "-":
-            raise InvalidJsonPatch("'path' with '-' can't be applied to 'replace' operation")
+            raise InvalidJsonPatch(
+                "'path' with '-' can't be applied to 'replace' operation"
+            )
 
         if isinstance(subobj, MutableSequence):
             if part >= len(subobj) or part < 0:
@@ -345,13 +326,15 @@ class ReplaceOperation(PatchOperation):
 
         elif isinstance(subobj, MutableMapping):
             if part not in subobj:
-                msg = "can't replace a non-existent object '{0}'".format(part)
+                msg = f"can't replace a non-existent object '{part}'"
                 raise JsonPatchConflict(msg)
         else:
             if part is None:
-                raise TypeError("invalid document type {0}".format(type(subobj)))
+                raise TypeError(f"invalid document type {type(subobj)}")
             else:
-                raise JsonPatchConflict("unable to fully resolve json pointer {0}, part {1}".format(self.location, part))
+                raise JsonPatchConflict(
+                    f"unable to fully resolve json pointer {self.location}, part {part}"
+                )
 
         subobj[part] = value
         return obj
@@ -368,17 +351,16 @@ class MoveOperation(PatchOperation):
 
     def apply(self, obj):
         try:
-            if isinstance(self.operation['from'], self.pointer_cls):
-                from_ptr = self.operation['from']
+            if isinstance(self.operation["from"], self.pointer_cls):
+                from_ptr = self.operation["from"]
             else:
-                from_ptr = self.pointer_cls(self.operation['from'])
-        except KeyError as ex:
-            raise InvalidJsonPatch(
-                "The operation does not contain a 'from' member")
+                from_ptr = self.pointer_cls(self.operation["from"])
+        except KeyError:
+            raise InvalidJsonPatch("The operation does not contain a 'from' member")
 
         subobj, part = from_ptr.to_last(obj)
         try:
-            value = subobj[part]
+            value = subobj[part]  # pyright: ignore [reportGeneralTypeIssues]
         except (KeyError, IndexError) as ex:
             raise JsonPatchConflict(str(ex))
 
@@ -386,31 +368,29 @@ class MoveOperation(PatchOperation):
         if self.pointer == from_ptr:
             return obj
 
-        if isinstance(subobj, MutableMapping) and \
-                self.pointer.contains(from_ptr):
-            raise JsonPatchConflict('Cannot move values into their own children')
+        if isinstance(subobj, MutableMapping) and self.pointer.contains(from_ptr):
+            raise JsonPatchConflict("Cannot move values into their own children")
 
-        obj = RemoveOperation({
-            'op': 'remove',
-            'path': self.operation['from']
-        }, pointer_cls=self.pointer_cls).apply(obj)
+        obj = RemoveOperation(
+            {"op": "remove", "path": self.operation["from"]},
+            pointer_cls=self.pointer_cls,
+        ).apply(obj)
 
-        obj = AddOperation({
-            'op': 'add',
-            'path': self.location,
-            'value': value
-        }, pointer_cls=self.pointer_cls).apply(obj)
+        obj = AddOperation(
+            {"op": "add", "path": self.location, "value": value},
+            pointer_cls=self.pointer_cls,
+        ).apply(obj)
 
         return obj
 
     @property
     def from_path(self):
-        from_ptr = self.pointer_cls(self.operation['from'])
-        return '/'.join(from_ptr.parts[:-1])
+        from_ptr = self.pointer_cls(self.operation["from"])
+        return "/".join(from_ptr.parts[:-1])
 
     @property
     def from_key(self):
-        from_ptr = self.pointer_cls(self.operation['from'])
+        from_ptr = self.pointer_cls(self.operation["from"])
         try:
             return int(from_ptr.parts[-1])
         except TypeError:
@@ -418,9 +398,9 @@ class MoveOperation(PatchOperation):
 
     @from_key.setter
     def from_key(self, value):
-        from_ptr = self.pointer_cls(self.operation['from'])
+        from_ptr = self.pointer_cls(self.operation["from"])
         from_ptr.parts[-1] = str(value)
-        self.operation['from'] = from_ptr.path
+        self.operation["from"] = from_ptr.path
 
     def _on_undo_remove(self, path, key):
         if self.from_path == path:
@@ -463,56 +443,56 @@ class TestOperation(PatchOperation):
             raise JsonPatchTestFailed(str(ex))
 
         try:
-            value = self.operation['value']
-        except KeyError as ex:
-            raise InvalidJsonPatch(
-                "The operation does not contain a 'value' member")
+            value = self.operation["value"]
+        except KeyError:
+            raise InvalidJsonPatch("The operation does not contain a 'value' member")
 
         if val != value:
-            msg = '{0} ({1}) is not equal to tested value {2} ({3})'
-            raise JsonPatchTestFailed(msg.format(val, type(val),
-                                                 value, type(value)))
+            msg = "{0} ({1}) is not equal to tested value {2} ({3})"
+            raise JsonPatchTestFailed(msg.format(val, type(val), value, type(value)))
 
         return obj
 
 
 class CopyOperation(PatchOperation):
-    """ Copies an object property or an array element to a new location """
+    """Copies an object property or an array element to a new location"""
 
     def apply(self, obj):
         try:
-            from_ptr = self.pointer_cls(self.operation['from'])
-        except KeyError as ex:
-            raise InvalidJsonPatch(
-                "The operation does not contain a 'from' member")
+            from_ptr = self.pointer_cls(self.operation["from"])
+        except KeyError:
+            raise InvalidJsonPatch("The operation does not contain a 'from' member")
 
         subobj, part = from_ptr.to_last(obj)
         try:
-            value = copy.deepcopy(subobj[part])
+            value = copy.deepcopy(
+                subobj[part]  # pyright: ignore [reportGeneralTypeIssues]
+            )
         except (KeyError, IndexError) as ex:
             raise JsonPatchConflict(str(ex))
 
-        obj = AddOperation({
-            'op': 'add',
-            'path': self.location,
-            'value': value
-        }, pointer_cls=self.pointer_cls).apply(obj)
+        obj = AddOperation(
+            {"op": "add", "path": self.location, "value": value},
+            pointer_cls=self.pointer_cls,
+        ).apply(obj)
 
         return obj
 
 
-class JsonPatch(object):
+class JsonPatch:
     json_dumper = staticmethod(json.dumps)
     json_loader = staticmethod(_jsonloads)
 
-    operations = MappingProxyType({
-        'remove': RemoveOperation,
-        'add': AddOperation,
-        'replace': ReplaceOperation,
-        'move': MoveOperation,
-        'test': TestOperation,
-        'copy': CopyOperation,
-    })
+    operations = MappingProxyType(
+        {
+            "remove": RemoveOperation,
+            "add": AddOperation,
+            "replace": ReplaceOperation,
+            "move": MoveOperation,
+            "test": TestOperation,
+            "copy": CopyOperation,
+        }
+    )
 
     """A JSON Patch is a list of Patch Operations.
 
@@ -559,6 +539,7 @@ class JsonPatch(object):
     ...     patch.apply(old)    #doctest: +ELLIPSIS
     {...}
     """
+
     def __init__(self, patch, pointer_cls=JsonPointer):
         self.patch = patch
         self.pointer_cls = pointer_cls
@@ -578,8 +559,10 @@ class JsonPatch(object):
             # - There's no possible false positive: if someone give a sequence
             #   of mappings, this won't raise.
             if isinstance(op, basestring):
-                raise InvalidJsonPatch("Document is expected to be sequence of "
-                                       "operations, got a sequence of strings.")
+                raise InvalidJsonPatch(
+                    "Document is expected to be sequence of "
+                    "operations, got a sequence of strings."
+                )
 
             self._get_operation(op)
 
@@ -604,7 +587,7 @@ class JsonPatch(object):
         return self._ops == other._ops
 
     def __ne__(self, other):
-        return not(self == other)
+        return not (self == other)
 
     @classmethod
     def from_string(cls, patch_str, loads=None, pointer_cls=JsonPointer):
@@ -628,8 +611,12 @@ class JsonPatch(object):
 
     @classmethod
     def from_diff(
-            cls, src, dst, optimization=True, dumps=None,
-            pointer_cls=JsonPointer,
+        cls,
+        src,
+        dst,
+        optimization=True,
+        dumps=None,
+        pointer_cls=JsonPointer,
     ):
         """Creates JsonPatch instance based on comparison of two document
         objects. Json patch would be created for `src` argument against `dst`
@@ -659,7 +646,7 @@ class JsonPatch(object):
         """
         json_dumper = dumps or cls.json_dumper
         builder = DiffBuilder(src, dst, json_dumper, pointer_cls=pointer_cls)
-        builder._compare_values('', None, src, dst)
+        builder._compare_values("", None, src, dst)
         ops = list(builder.execute())
         return cls(ops, pointer_cls=pointer_cls)
 
@@ -694,23 +681,22 @@ class JsonPatch(object):
         return obj
 
     def _get_operation(self, operation):
-        if 'op' not in operation:
+        if "op" not in operation:
             raise InvalidJsonPatch("Operation does not contain 'op' member")
 
-        op = operation['op']
+        op = operation["op"]
 
         if not isinstance(op, basestring):
             raise InvalidJsonPatch("Operation's op must be a string")
 
         if op not in self.operations:
-            raise InvalidJsonPatch("Unknown operation {0!r}".format(op))
+            raise InvalidJsonPatch(f"Unknown operation {op!r}")
 
         cls = self.operations[op]
         return cls(operation, pointer_cls=self.pointer_cls)
 
 
-class DiffBuilder(object):
-
+class DiffBuilder:
     def __init__(self, src_doc, dst_doc, dumps=json.dumps, pointer_cls=JsonPointer):
         self.dumps = dumps
         self.pointer_cls = pointer_cls
@@ -743,7 +729,7 @@ class DiffBuilder(object):
 
         except TypeError:
             storage = self.index_storage2[st]
-            for i in range(len(storage)-1, -1, -1):
+            for i in range(len(storage) - 1, -1, -1):
                 if storage[i][0] == typed_key:
                     return storage.pop(i)[1]
 
@@ -779,14 +765,19 @@ class DiffBuilder(object):
         while curr is not root:
             if curr[1] is not root:
                 op_first, op_second = curr[2], curr[1][2]
-                if op_first.location == op_second.location and \
-                        type(op_first) == RemoveOperation and \
-                        type(op_second) == AddOperation:
-                    yield ReplaceOperation({
-                        'op': 'replace',
-                        'path': op_second.location,
-                        'value': op_second.operation['value'],
-                    }, pointer_cls=self.pointer_cls).operation
+                if (
+                    op_first.location == op_second.location
+                    and type(op_first) == RemoveOperation
+                    and type(op_second) == AddOperation
+                ):
+                    yield ReplaceOperation(
+                        {
+                            "op": "replace",
+                            "path": op_second.location,
+                            "value": op_second.operation["value"],
+                        },
+                        pointer_cls=self.pointer_cls,
+                    ).operation
                     curr = curr[1][1]
                     continue
 
@@ -803,26 +794,35 @@ class DiffBuilder(object):
 
             self.remove(index)
             if op.location != _path_join(path, key):
-                new_op = MoveOperation({
-                    'op': 'move',
-                    'from': op.location,
-                    'path': _path_join(path, key),
-                }, pointer_cls=self.pointer_cls)
+                new_op = MoveOperation(
+                    {
+                        "op": "move",
+                        "from": op.location,
+                        "path": _path_join(path, key),
+                    },
+                    pointer_cls=self.pointer_cls,
+                )
                 self.insert(new_op)
         else:
-            new_op = AddOperation({
-                'op': 'add',
-                'path': _path_join(path, key),
-                'value': item,
-            }, pointer_cls=self.pointer_cls)
+            new_op = AddOperation(
+                {
+                    "op": "add",
+                    "path": _path_join(path, key),
+                    "value": item,
+                },
+                pointer_cls=self.pointer_cls,
+            )
             new_index = self.insert(new_op)
             self.store_index(item, new_index, _ST_ADD)
 
     def _item_removed(self, path, key, item):
-        new_op = RemoveOperation({
-            'op': 'remove',
-            'path': _path_join(path, key),
-        }, pointer_cls=self.pointer_cls)
+        new_op = RemoveOperation(
+            {
+                "op": "remove",
+                "path": _path_join(path, key),
+            },
+            pointer_cls=self.pointer_cls,
+        )
         index = self.take_index(item, _ST_ADD)
         new_index = self.insert(new_op)
         if index is not None:
@@ -838,11 +838,14 @@ class DiffBuilder(object):
 
             self.remove(index)
             if new_op.location != op.location:
-                new_op = MoveOperation({
-                    'op': 'move',
-                    'from': new_op.location,
-                    'path': op.location,
-                }, pointer_cls=self.pointer_cls)
+                new_op = MoveOperation(
+                    {
+                        "op": "move",
+                        "from": new_op.location,
+                        "path": op.location,
+                    },
+                    pointer_cls=self.pointer_cls,
+                )
                 new_index[2] = new_op
 
             else:
@@ -852,11 +855,16 @@ class DiffBuilder(object):
             self.store_index(item, new_index, _ST_REMOVE)
 
     def _item_replaced(self, path, key, item):
-        self.insert(ReplaceOperation({
-            'op': 'replace',
-            'path': _path_join(path, key),
-            'value': item,
-        }, pointer_cls=self.pointer_cls))
+        self.insert(
+            ReplaceOperation(
+                {
+                    "op": "replace",
+                    "path": _path_join(path, key),
+                    "value": item,
+                },
+                pointer_cls=self.pointer_cls,
+            )
+        )
 
     def _compare_dicts(self, path, src, dst):
         src_keys = set(src.keys())
@@ -883,12 +891,14 @@ class DiffBuilder(object):
                 if old == new:
                     continue
 
-                elif isinstance(old, MutableMapping) and \
-                    isinstance(new, MutableMapping):
+                elif isinstance(old, MutableMapping) and isinstance(
+                    new, MutableMapping
+                ):
                     self._compare_dicts(_path_join(path, key), old, new)
 
-                elif isinstance(old, MutableSequence) and \
-                        isinstance(new, MutableSequence):
+                elif isinstance(old, MutableSequence) and isinstance(
+                    new, MutableSequence
+                ):
                     self._compare_lists(_path_join(path, key), old, new)
 
                 else:
@@ -902,12 +912,10 @@ class DiffBuilder(object):
                 self._item_added(path, key, dst[key])
 
     def _compare_values(self, path, key, src, dst):
-        if isinstance(src, MutableMapping) and \
-                isinstance(dst, MutableMapping):
+        if isinstance(src, MutableMapping) and isinstance(dst, MutableMapping):
             self._compare_dicts(_path_join(path, key), src, dst)
 
-        elif isinstance(src, MutableSequence) and \
-                isinstance(dst, MutableSequence):
+        elif isinstance(src, MutableSequence) and isinstance(dst, MutableSequence):
             self._compare_lists(_path_join(path, key), src, dst)
 
         # To ensure we catch changes to JSON, we can't rely on a simple
@@ -928,4 +936,4 @@ def _path_join(path, key):
     if key is None:
         return path
 
-    return path + '/' + str(key).replace('~', '~0').replace('/', '~1')
+    return path + "/" + str(key).replace("~", "~0").replace("/", "~1")

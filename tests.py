@@ -1,7 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
-from __future__ import unicode_literals
 
 import json
 import decimal
@@ -20,7 +18,7 @@ except ImportError:
 
 class ApplyPatchTestCase(unittest.TestCase):
     def test_js_file(self):
-        with open("./tests.js", "r") as f:
+        with open("./tests.js") as f:
             tests = json.load(f)
             for test in tests:
                 try:
@@ -1023,7 +1021,7 @@ class CustomJsonPointer(jsonpointer.JsonPointer):
 
 class PrefixJsonPointer(jsonpointer.JsonPointer):
     def __init__(self, pointer):
-        super(PrefixJsonPointer, self).__init__("/foo/bar" + pointer)
+        super().__init__("/foo/bar" + pointer)
 
 
 class CustomJsonPointerTests(unittest.TestCase):

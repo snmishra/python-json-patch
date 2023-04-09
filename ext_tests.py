@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 #
 # python-json-patch - An implementation of the JSON Patch format
 # https://github.com/stefankoegl/python-json-patch
@@ -44,7 +43,7 @@ class TestCaseTemplate(unittest.TestCase):
     """ A generic test case for running external tests """
 
     def _test(self, test):
-        if not 'doc' in test or not 'patch' in test:
+        if 'doc' not in test or 'patch' not in test:
             # incomplete
             return
 
@@ -67,7 +66,7 @@ class TestCaseTemplate(unittest.TestCase):
             # if there is no 'expected' we only verify that applying the patch
             # does not raise an exception
             if 'expected' in test:
-                self.assertEquals(res, test['expected'], test.get('comment', ''))
+                self.assertEqual(res, test['expected'], test.get('comment', ''))
 
 
 def make_test_case(tests):
@@ -98,7 +97,7 @@ def get_suite(filenames):
             # we use the (potentially) patched version of json.load here
             tests = jsonpatch.json.load(f)
             cls = make_test_case(tests)
-            suite.addTest(unittest.makeSuite(cls))
+            suite.addTest(unittest.defaultTestLoader.loadTestsFromTestCase(cls))
 
     return suite
 
