@@ -44,8 +44,4 @@ jsondiff = "jsonpatch.jsondiff:diff_files"
 jsonpatch = "jsonpatch.jsonpatch_cli:patch_files"
 
 [tool.hatch.version]
-path = "src/jsonpatch.py"
-
-
-[tool.hatch.build.sources]
-"src/" = "jsonpatch/"
+path = "jsonpatch/jsonpatch.py"
