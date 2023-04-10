@@ -25,7 +25,7 @@ help:
 
 mypy: ## Run mypy in container
 ifeq ($(ARGS),)
-	mypy cases dashboard positions company main
+	mypy --ignore-missing *.py
 else
 	mypy ${ARGS}
 endif
