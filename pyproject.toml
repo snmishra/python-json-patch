@@ -28,7 +28,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries",
   "Topic :: Utilities",
 ]
-dependencies = ["jsonpointer>=1.9"]
+dependencies = ["jsonpointer>=1.9", 'typing_extensions; python_version<"3.8"']
 
 [project.urls]
 Documentation = "https://python-json-patch.readthedocs.org/"
@@ -45,3 +45,9 @@ jsonpatch = "jsonpatch.jsonpatch_cli:patch_files"
 
 [tool.hatch.version]
 path = "jsonpatch/jsonpatch.py"
+
+[tool.hatch.envs.test]
+dependencies = ["coverage"]
+
+[[tool.hatch.envs.test.matrix]]
+python = ["3.7", "3.8", "3.9", "3.10", "3.11"]

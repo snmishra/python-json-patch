@@ -38,7 +38,14 @@ import functools
 import json
 from collections.abc import MutableMapping, MutableSequence, Sequence
 from types import MappingProxyType
-from typing import Any, Literal, TypedDict
+import sys
+
+from typing import Any, Union
+
+if sys.version_info >= (3, 8):
+    from typing import Literal, TypedDict
+else:
+    from typing_extensions import Literal, TypedDict
 
 from jsonpointer import JsonPointer, JsonPointerException
 
@@ -66,7 +73,7 @@ MoveSpec = TypedDict(
     "MoveSpec", {"op": Literal["move", "copy"], "from": str, "path": str}
 )
 
-Operation = RemoveSpec | AddSpec | MoveSpec
+Operation = Union[RemoveSpec, AddSpec, MoveSpec]
 
 
 class JsonPatchException(Exception):
