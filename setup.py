@@ -2,29 +2,22 @@
 
 import re
 
-try:
-    from setuptools import setup
+from setuptools import setup
 
-    has_setuptools = True
-except ImportError:
-    from distutils.core import setup
+with open("jsonpatch.py") as srcfile:
+    src = srcfile.read()
+    metadata = dict(re.findall('__([a-z]+)__ = "([^"]+)"', src))
+    docstrings = re.findall('"""([^"]*)"""', src, re.MULTILINE | re.DOTALL)
+    print(metadata)
 
-    has_setuptools = False
-
-src = open("jsonpatch.py", encoding="utf-8").read()
-metadata = dict(re.findall("__([a-z]+)__ = '([^']+)'", src))
-docstrings = re.findall('"""([^"]*)"""', src, re.MULTILINE | re.DOTALL)
 
 PACKAGE = "jsonpatch"
 
 MODULES = ["jsonpatch"]
 
-REQUIREMENTS = list(open("requirements.txt"))
+REQUIREMENTS = list(open("requirements.in"))
 
-if has_setuptools:
-    OPTIONS = {"install_requires": REQUIREMENTS}
-else:
-    OPTIONS = {}
+OPTIONS = {"install_requires": REQUIREMENTS}
 
 AUTHOR_EMAIL = metadata["author"]
 VERSION = metadata["version"]
@@ -83,5 +76,5 @@ setup(
         "Tests": "https://travis-ci.org/stefankoegl/python-json-patch",
         "Test Coverage": "https://coveralls.io/r/stefankoegl/python-json-patch",
     },
-    **OPTIONS,
+    **OPTIONS,  # type: ignore [arg-type]
 )
