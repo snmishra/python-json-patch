@@ -3,3 +3,4 @@ wheel
 black
 ruff
 mypy
+types-setuptools

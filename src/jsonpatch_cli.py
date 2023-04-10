@@ -53,6 +53,8 @@ def patch_files():
     doc = json.load(args.ORIGINAL)
     patch = json.load(args.PATCH)
     result = jsonpatch.apply_patch(doc, patch)
+    atomic = False
+    pathname = None
 
     if args.in_place:
         dirname = os.path.abspath(os.path.dirname(args.ORIGINAL.name))
@@ -76,7 +78,6 @@ def patch_files():
             if args.backup:
                 os.rename(args.ORIGINAL.name, args.ORIGINAL.name + ".orig")
             fp = open(args.ORIGINAL.name, "w")
-            atomic = False
 
     else:
         # Since we're not replacing the original file in-place, write
@@ -104,8 +105,9 @@ def patch_files():
 
                 if args.backup:
                     os.link(args.ORIGINAL.name, args.ORIGINAL.name + ".orig")
-                os.chmod(pathname, os.stat(args.ORIGINAL.name).st_mode)
-                os.rename(pathname, args.ORIGINAL.name)
+                if pathname:
+                    os.chmod(pathname, os.stat(args.ORIGINAL.name).st_mode)
+                    os.rename(pathname, args.ORIGINAL.name)
 
             except OSError:
                 # In the event we could not actually do the atomic
@@ -113,7 +115,8 @@ def patch_files():
                 # way and finally move the temporary file into place.
 
                 os.unlink(args.ORIGINAL.name)
-                os.rename(pathname, args.ORIGINAL.name)
+                if pathname:
+                    os.rename(pathname, args.ORIGINAL.name)
 
 
 if __name__ == "__main__":

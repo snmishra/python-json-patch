@@ -38,6 +38,7 @@ import functools
 import json
 from collections.abc import MutableMapping, MutableSequence, Sequence
 from types import MappingProxyType
+from typing import Any, Literal, TypedDict
 
 from jsonpointer import JsonPointer, JsonPointerException
 
@@ -54,6 +55,18 @@ __license__ = "Modified BSD License"
 
 # pylint: disable=E0611,W0404
 basestring = (bytes, str)  # pylint: disable=C0103,W0622
+
+
+RemoveSpec = TypedDict("RemoveSpec", {"op": Literal["remove"], "path": str})
+AddSpec = TypedDict(
+    "AddSpec", {"op": Literal["add", "test", "replace"], "path": str, "value": Any}
+)
+
+MoveSpec = TypedDict(
+    "MoveSpec", {"op": Literal["move", "copy"], "from": str, "path": str}
+)
+
+Operation = RemoveSpec | AddSpec | MoveSpec
 
 
 class JsonPatchException(Exception):
@@ -163,10 +176,10 @@ def make_patch(src, dst, pointer_cls=JsonPointer):
 class PatchOperation:
     """A single operation inside a JSON Patch."""
 
-    def __init__(self, operation, pointer_cls=JsonPointer):
+    def __init__(self, operation: Operation, pointer_cls=JsonPointer):
         self.pointer_cls = pointer_cls
 
-        if not operation.__contains__("path"):
+        if "path" not in operation:
             raise InvalidJsonPatch("Operation must have a 'path' member")
 
         if isinstance(operation["path"], self.pointer_cls):
@@ -217,6 +230,8 @@ class PatchOperation:
 class RemoveOperation(PatchOperation):
     """Removes an object property or an array element."""
 
+    operation: RemoveSpec
+
     def apply(self, obj):
         subobj, part = self.pointer.to_last(obj)
 
@@ -250,6 +265,8 @@ class RemoveOperation(PatchOperation):
 
 class AddOperation(PatchOperation):
     """Adds an object property or an array element."""
+
+    operation: AddSpec
 
     def apply(self, obj):
         try:
@@ -304,6 +321,8 @@ class AddOperation(PatchOperation):
 class ReplaceOperation(PatchOperation):
     """Replaces an object property or an array element by a new value."""
 
+    operation: AddSpec
+
     def apply(self, obj):
         try:
             value = self.operation["value"]
@@ -348,6 +367,8 @@ class ReplaceOperation(PatchOperation):
 
 class MoveOperation(PatchOperation):
     """Moves an object property or an array element to a new location."""
+
+    operation: MoveSpec
 
     def apply(self, obj):
         try:
@@ -432,6 +453,8 @@ class MoveOperation(PatchOperation):
 class TestOperation(PatchOperation):
     """Test value by specified location."""
 
+    operation: AddSpec
+
     def apply(self, obj):
         try:
             subobj, part = self.pointer.to_last(obj)
@@ -456,6 +479,8 @@ class TestOperation(PatchOperation):
 
 class CopyOperation(PatchOperation):
     """Copies an object property or an array element to a new location"""
+
+    operation: MoveSpec
 
     def apply(self, obj):
         try:
@@ -680,7 +705,7 @@ class JsonPatch:
 
         return obj
 
-    def _get_operation(self, operation):
+    def _get_operation(self, operation: Operation):
         if "op" not in operation:
             raise InvalidJsonPatch("Operation does not contain 'op' member")
 
